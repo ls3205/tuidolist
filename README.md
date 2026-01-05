@@ -14,3 +14,9 @@ This project served as my first Rust project and was largely based on [this]("ht
 cd /path/to/repo
 cargo build --release
 ```
+
+### Run
+```
+cd /path/to/repo/target/release
+./tuidolist
+```
