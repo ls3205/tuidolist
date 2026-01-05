@@ -1,5 +1,3 @@
-use std::fmt::format;
-
 use color_eyre::eyre::{Ok, Result};
 use ratatui::{
     DefaultTerminal, Frame,
@@ -18,6 +16,7 @@ struct AppState {
     is_add_new: bool,
     is_deleting: bool,
     is_open: bool,
+    is_editing: bool,
     input_state: InputState,
 }
 
@@ -88,6 +87,32 @@ fn run(mut terminal: DefaultTerminal, app_state: &mut AppState) -> Result<()> {
                         app_state.input_state.select_state = InputSelectState::Name;
                     }
                 }
+            } else if app_state.is_editing {
+                match handle_edit(k, app_state) {
+                    FormAction::None => {}
+                    FormAction::Submit => {
+                        app_state.is_editing = false;
+
+                        if let Some(item) = app_state
+                            .list_state
+                            .selected()
+                            .and_then(|idx| app_state.items.get_mut(idx))
+                        {
+                            item.name = app_state.input_state.name_input.clone();
+                            item.description = app_state.input_state.description_input.clone();
+                        }
+
+                        app_state.input_state.name_input.clear();
+                        app_state.input_state.description_input.clear();
+                        app_state.input_state.select_state = InputSelectState::Name;
+                    }
+                    FormAction::Escape => {
+                        app_state.is_editing = false;
+                        app_state.input_state.name_input.clear();
+                        app_state.input_state.description_input.clear();
+                        app_state.input_state.select_state = InputSelectState::Name;
+                    }
+                }
             } else if app_state.is_deleting {
                 handle_delete(k, app_state);
             } else if app_state.is_open {
@@ -113,6 +138,45 @@ fn handle_open(k: KeyEvent, app_state: &mut AppState) -> bool {
 }
 
 fn handle_add_new(k: KeyEvent, app_state: &mut AppState) -> FormAction {
+    match k.code {
+        event::KeyCode::Char(c) => {
+            if app_state.input_state.select_state == InputSelectState::Name {
+                app_state.input_state.name_input.push(c)
+            } else {
+                app_state.input_state.description_input.push(c)
+            };
+        }
+        event::KeyCode::Backspace => {
+            if app_state.input_state.select_state == InputSelectState::Name {
+                app_state.input_state.name_input.pop()
+            } else {
+                app_state.input_state.description_input.pop()
+            };
+        }
+        event::KeyCode::Enter => {
+            if app_state.input_state.name_input.is_empty() {
+                return FormAction::None;
+            } else {
+                return FormAction::Submit;
+            }
+        }
+        event::KeyCode::Esc => {
+            return FormAction::Escape;
+        }
+        event::KeyCode::Tab => {
+            if app_state.input_state.select_state == InputSelectState::Name {
+                app_state.input_state.select_state = InputSelectState::Description
+            } else {
+                app_state.input_state.select_state = InputSelectState::Name
+            }
+        }
+        _ => {}
+    }
+
+    FormAction::None
+}
+
+fn handle_edit(k: KeyEvent, app_state: &mut AppState) -> FormAction {
     match k.code {
         event::KeyCode::Char(c) => {
             if app_state.input_state.select_state == InputSelectState::Name {
@@ -188,6 +252,17 @@ fn handle_key(k: KeyEvent, app_state: &mut AppState) -> bool {
                     app_state.is_deleting = true;
                 }
             }
+            'e' => {
+                if let Some(item) = app_state
+                    .list_state
+                    .selected()
+                    .and_then(|idx| app_state.items.get(idx))
+                {
+                    app_state.is_editing = true;
+                    app_state.input_state.name_input = item.name.clone();
+                    app_state.input_state.description_input = item.description.clone();
+                }
+            }
             'c' => {
                 if let Some(item) = app_state
                     .list_state
@@ -231,6 +306,8 @@ fn render(frame: &mut Frame, app_state: &mut AppState) {
                 + "[j]".to_span().fg(Color::Green)
                 + " New ".to_span().fg(Color::Yellow)
                 + "[a]".to_span().fg(Color::Green)
+                + " Edit ".to_span().fg(Color::Yellow)
+                + "[e]".to_span().fg(Color::Green)
                 + " Delete ".to_span().fg(Color::Yellow)
                 + "[d]".to_span().fg(Color::Green)
                 + " Complete ".to_span().fg(Color::Yellow)
@@ -245,6 +322,10 @@ fn render(frame: &mut Frame, app_state: &mut AppState) {
 
     if app_state.is_add_new {
         render_add(frame, app_state);
+    }
+
+    if app_state.is_editing {
+        render_edit(frame, app_state);
     }
 
     if app_state.is_deleting {
@@ -484,4 +565,103 @@ fn render_item(frame: &mut Frame, app_state: &mut AppState) {
                 .border_type(BorderType::Rounded),
         )
         .render(description_area, frame.buffer_mut());
+}
+
+fn render_edit(frame: &mut Frame, app_state: &mut AppState) {
+    let area = frame.area();
+    let popup_width = (area.width as f32 * 0.3) as u16;
+    let popup_height = (area.height as f32 * 0.4) as u16;
+    let popup_x = (area.width - popup_width) / 2;
+    let popup_y = (area.height - popup_height) / 2;
+
+    let popup_area = ratatui::layout::Rect::new(popup_x, popup_y, popup_width, popup_height);
+
+    let popup_block = Block::bordered()
+        .title(
+            " Add New Item "
+                .to_span()
+                .fg(Color::Yellow)
+                .into_centered_line(),
+        )
+        .title_bottom(
+            (" Next ".to_span().fg(Color::Yellow)
+                + "[Tab]".to_span().fg(Color::Green)
+                + " Submit ".to_span().fg(Color::Yellow)
+                + "[Enter]".to_span().fg(Color::Green)
+                + " Cancel ".to_span().fg(Color::Yellow)
+                + "[Esc] ".to_span().fg(Color::Green))
+            .alignment(ratatui::layout::HorizontalAlignment::Center),
+        )
+        .border_type(BorderType::Rounded)
+        .fg(Color::Cyan);
+
+    frame.render_widget(popup_block, popup_area);
+
+    let [title_area, description_area] =
+        Layout::vertical([Constraint::Length(3), Constraint::Min(0)])
+            .margin(1)
+            .areas(popup_area);
+
+    Paragraph::new(
+        " ".to_span()
+            + app_state
+                .input_state
+                .name_input
+                .as_str()
+                .fg(Color::default())
+            + if app_state.input_state.select_state == InputSelectState::Name {
+                "|".to_span().fg(Color::default())
+            } else {
+                "".to_span()
+            },
+    )
+    .scroll((
+        0,
+        app_state
+            .input_state
+            .name_input
+            .len()
+            .saturating_sub(title_area.width as usize - 4) as u16,
+    ))
+    .block(
+        Block::bordered()
+            .title(" Title ".fg(Color::Yellow))
+            .fg(
+                if app_state.input_state.select_state == InputSelectState::Name {
+                    Color::White
+                } else {
+                    Color::Green
+                },
+            )
+            .border_type(BorderType::Rounded),
+    )
+    .render(title_area, frame.buffer_mut());
+
+    Paragraph::new(
+        app_state
+            .input_state
+            .description_input
+            .as_str()
+            .fg(Color::default())
+            + if app_state.input_state.select_state == InputSelectState::Description {
+                "|".to_span().fg(Color::default())
+            } else {
+                "".to_span()
+            },
+    )
+    .wrap(Wrap { trim: false })
+    .block(
+        Block::bordered()
+            .title(" Description ".fg(Color::Yellow))
+            .fg(
+                if app_state.input_state.select_state == InputSelectState::Description {
+                    Color::White
+                } else {
+                    Color::Green
+                },
+            )
+            .padding(Padding::uniform(1))
+            .border_type(BorderType::Rounded),
+    )
+    .render(description_area, frame.buffer_mut());
 }
