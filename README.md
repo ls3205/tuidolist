@@ -3,7 +3,7 @@
 
 **TUIDoList** is a simple, easy to use, and fast terminal based to do list written in Rust.
 
-This project served as my first Rust project and was largely based on [this]("https://www.youtube.com/watch?v=ZTbxXpyqpQ0") YouTube video by Jonkero.
+This project served as my first Rust project and was largely based on [this](https://www.youtube.com/watch?v=ZTbxXpyqpQ0) YouTube video by Jonkero.
 
 ## Installation
 ### Dependencies
