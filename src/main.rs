@@ -9,8 +9,10 @@ use ratatui::{
     widgets::{Block, BorderType, List, ListItem, ListState, Padding, Paragraph, Wrap},
 };
 
+mod fs;
+
 #[derive(Debug, Default)]
-struct AppState {
+pub struct AppState {
     items: Vec<TodoItem>,
     list_state: ListState,
     is_add_new: bool,
@@ -51,6 +53,8 @@ fn main() -> Result<()> {
     let mut state = AppState::default();
     color_eyre::install()?;
 
+    state.items = crate::fs::read();
+
     let terminal = ratatui::init();
     let res = run(terminal, &mut state);
 
@@ -79,6 +83,8 @@ fn run(mut terminal: DefaultTerminal, app_state: &mut AppState) -> Result<()> {
                         app_state.input_state.name_input.clear();
                         app_state.input_state.description_input.clear();
                         app_state.input_state.select_state = InputSelectState::Name;
+
+                        crate::fs::write(app_state);
                     }
                     FormAction::Escape => {
                         app_state.is_add_new = false;
@@ -105,6 +111,8 @@ fn run(mut terminal: DefaultTerminal, app_state: &mut AppState) -> Result<()> {
                         app_state.input_state.name_input.clear();
                         app_state.input_state.description_input.clear();
                         app_state.input_state.select_state = InputSelectState::Name;
+
+                        crate::fs::write(app_state);
                     }
                     FormAction::Escape => {
                         app_state.is_editing = false;
@@ -221,6 +229,8 @@ fn handle_delete(k: KeyEvent, app_state: &mut AppState) -> bool {
             'y' => {
                 if let Some(idx) = app_state.list_state.selected() {
                     app_state.items.remove(idx);
+
+                    crate::fs::write(app_state);
                 }
                 app_state.is_deleting = false;
             }

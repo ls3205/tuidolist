@@ -26,3 +26,11 @@ cd /path/to/repo
 cargo run --release
 ```
 to build and run at the same time. The final compiled binary will still be located at `/path/to/repo/target/release`.
+
+## Info
+### List Location
+By default, the list is stored in JSON form in
+```
+~/.tuidolist/items.json
+```
+In the future, I plan to include the ability to change this to a custom location, though this is not implemented at this time.
