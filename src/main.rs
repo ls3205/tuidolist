@@ -19,6 +19,7 @@ pub struct AppState {
     is_deleting: bool,
     is_open: bool,
     is_editing: bool,
+    is_moving: bool,
     input_state: InputState,
 }
 
@@ -125,6 +126,8 @@ fn run(mut terminal: DefaultTerminal, app_state: &mut AppState) -> Result<()> {
                 handle_delete(k, app_state);
             } else if app_state.is_open {
                 handle_open(k, app_state);
+            } else if app_state.is_moving {
+                handle_move(k, app_state);
             } else {
                 if handle_key(k, app_state) {
                     break;
@@ -243,6 +246,37 @@ fn handle_delete(k: KeyEvent, app_state: &mut AppState) -> bool {
     false
 }
 
+fn handle_move(k: KeyEvent, app_state: &mut AppState) -> bool {
+    match k.code {
+        event::KeyCode::Esc | event::KeyCode::Enter => {
+            app_state.is_moving = false;
+            crate::fs::write(app_state);
+        }
+        event::KeyCode::Char(c) => match c {
+            'j' => {
+                if let Some(selected_idx) = app_state.list_state.selected()
+                    && selected_idx < app_state.items.len() - 1
+                {
+                    app_state.items.swap(selected_idx, selected_idx + 1);
+                    app_state.list_state.select_next();
+                }
+            }
+            'k' => {
+                if let Some(selected_idx) = app_state.list_state.selected()
+                    && selected_idx > 0
+                {
+                    app_state.items.swap(selected_idx, selected_idx - 1);
+                    app_state.list_state.select_previous();
+                }
+            }
+            _ => {}
+        },
+        _ => {}
+    }
+
+    false
+}
+
 fn handle_key(k: KeyEvent, app_state: &mut AppState) -> bool {
     match k.code {
         event::KeyCode::Esc => {
@@ -260,6 +294,11 @@ fn handle_key(k: KeyEvent, app_state: &mut AppState) -> bool {
             'd' => {
                 if app_state.list_state.selected().is_some() {
                     app_state.is_deleting = true;
+                }
+            }
+            'm' => {
+                if app_state.list_state.selected().is_some() {
+                    app_state.is_moving = true;
                 }
             }
             'e' => {
@@ -301,32 +340,50 @@ fn render(frame: &mut Frame, app_state: &mut AppState) {
         .margin(1)
         .areas(frame.area());
 
+    let title_bottom = if app_state.is_moving {
+        " Move Up ".to_span().fg(Color::Yellow)
+            + "[k]".to_span().fg(Color::Green)
+            + " Move Down ".to_span().fg(Color::Yellow)
+            + "[j]".to_span().fg(Color::Green)
+            + " Stop Moving ".to_span().fg(Color::Yellow)
+            + "[Enter/Esc] ".to_span().fg(Color::Green)
+    } else {
+        " Up ".to_span().fg(Color::Yellow)
+            + "[k]".to_span().fg(Color::Green)
+            + " Down ".to_span().fg(Color::Yellow)
+            + "[j]".to_span().fg(Color::Green)
+            + " New ".to_span().fg(Color::Yellow)
+            + "[a]".to_span().fg(Color::Green)
+            + " Edit ".to_span().fg(Color::Yellow)
+            + "[e]".to_span().fg(Color::Green)
+            + " Delete ".to_span().fg(Color::Yellow)
+            + "[d]".to_span().fg(Color::Green)
+            + " Complete ".to_span().fg(Color::Yellow)
+            + "[c]".to_span().fg(Color::Green)
+            + " Move ".to_span().fg(Color::Yellow)
+            + "[m]".to_span().fg(Color::Green)
+            + " Exit ".to_span().fg(Color::Yellow)
+            + "[Esc] ".to_span().fg(Color::Green)
+    };
+
     Block::bordered()
         .border_type(ratatui::widgets::BorderType::Rounded)
         .title(
-            " TUIDoList "
-                .to_span()
-                .into_centered_line()
-                .fg(Color::Yellow),
+            if app_state.is_moving {
+                " Moving "
+            } else {
+                " TUIDoList "
+            }
+            .to_span()
+            .into_centered_line()
+            .fg(Color::Yellow),
         )
-        .title_bottom(
-            (" Up ".to_span().fg(Color::Yellow)
-                + "[k]".to_span().fg(Color::Green)
-                + " Down ".to_span().fg(Color::Yellow)
-                + "[j]".to_span().fg(Color::Green)
-                + " New ".to_span().fg(Color::Yellow)
-                + "[a]".to_span().fg(Color::Green)
-                + " Edit ".to_span().fg(Color::Yellow)
-                + "[e]".to_span().fg(Color::Green)
-                + " Delete ".to_span().fg(Color::Yellow)
-                + "[d]".to_span().fg(Color::Green)
-                + " Complete ".to_span().fg(Color::Yellow)
-                + "[c]".to_span().fg(Color::Green)
-                + " Exit ".to_span().fg(Color::Yellow)
-                + "[Esc] ".to_span().fg(Color::Green))
-            .alignment(ratatui::layout::HorizontalAlignment::Center),
-        )
-        .fg(Color::Cyan)
+        .title_bottom(title_bottom.alignment(ratatui::layout::HorizontalAlignment::Center))
+        .fg(if app_state.is_moving {
+            Color::Green
+        } else {
+            Color::Cyan
+        })
         .render(border_area, frame.buffer_mut());
     render_list(frame, app_state);
 
