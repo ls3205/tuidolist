@@ -128,10 +128,8 @@ fn run(mut terminal: DefaultTerminal, app_state: &mut AppState) -> Result<()> {
                 handle_open(k, app_state);
             } else if app_state.is_moving {
                 handle_move(k, app_state);
-            } else {
-                if handle_key(k, app_state) {
-                    break;
-                }
+            } else if handle_key(k, app_state) {
+                break;
             }
         }
     }
@@ -139,12 +137,10 @@ fn run(mut terminal: DefaultTerminal, app_state: &mut AppState) -> Result<()> {
 }
 
 fn handle_open(k: KeyEvent, app_state: &mut AppState) -> bool {
-    match k.code {
-        event::KeyCode::Esc => {
-            app_state.is_open = false;
-        }
-        _ => {}
+    if k.code == event::KeyCode::Esc {
+        app_state.is_open = false;
     }
+
     false
 }
 
